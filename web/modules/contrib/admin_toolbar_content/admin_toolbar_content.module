@@ -1,0 +1,440 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Url;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
+
+/**
+ * Implements hook_page_attachments().
+ *
+ * @param $page
+ */
+function admin_toolbar_content_page_attachments(&$page) {
+  $page['#attached']['library'][] = 'admin_toolbar_content/global';
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ *
+ * @param $implementations
+ * @param $hook
+ */
+function admin_toolbar_content_module_implements_alter(&$implementations, $hook) {
+  if ($hook == 'menu_links_discovered_alter') {
+    $settings = $implementations['admin_toolbar_content'];
+    unset($implementations['admin_toolbar_content']);
+    $implementations['admin_toolbar_content'] = $settings;
+  }
+}
+
+/**
+ * Implements hook_menu_links_discovered_alter();
+ *
+ * @see \Drupal\admin_toolbar_content\Plugin\Derivative\ContentMenuLinkDerivative
+ * @see \Drupal\admin_toolbar_content\Plugin\Derivative\MediaMenuLinkDerivative
+ * @see \Drupal\admin_toolbar_content\Plugin\Derivative\CategoriesMenuLinkDerivative
+ *
+ * @param array $links
+ *
+ * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+ * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+ */
+function admin_toolbar_content_menu_links_discovered_alter(array &$links) {
+  $moduleHandler = \Drupal::moduleHandler();
+  $entityTypeManager = \Drupal::entityTypeManager();
+  $config = \Drupal::config('admin_toolbar_content.settings');
+
+  $enhance_content_item = $config->get('enhance_content_item') ?? 0;
+  if ($enhance_content_item && $moduleHandler->moduleExists('node')) {
+
+    // Unset any non admin toolbar content link if requested.
+    $config = \Drupal::config('admin_toolbar_content.settings');
+    $hide_non_content_items = $config->get('hide_non_content_items') ?? 0;
+    if ($hide_non_content_items) {
+      $parents = ['system.admin_content'];
+      while (!empty($parents)) {
+        $removed = [];
+        foreach ($links as $name => $link) {
+          if (isset($link['parent']) && in_array($link['parent'], $parents)) {
+            if (!str_starts_with($name, 'admin_toolbar_content')) {
+              unset($links[$name]);
+              $removed[] = $name;
+            }
+          }
+        }
+        $parents = $removed;
+      }
+    }
+
+    // Unset the original "add content" menu item and it's children.
+    // These are replaced with the links from ContentMenuLinkDerivative.
+    unset($links['admin_toolbar_tools.extra_links:node.add']);
+    $contentTypes = $entityTypeManager->getStorage('node_type')->loadMultiple();
+    foreach ($contentTypes as $contentType) {
+      unset($links['admin_toolbar_tools.extra_links:node.add.' . $contentType->id()]);
+    }
+  }
+
+  $show_categories_item = $config->get('show_categories_item') ?? 0;
+  if ($show_categories_item && $moduleHandler->moduleExists('taxonomy')) {
+    $vocabularies = $entityTypeManager->getStorage('taxonomy_vocabulary')->loadMultiple();
+    foreach ($vocabularies as $id => $vocabulary) {
+      if (isset($links['admin_toolbar_tools.extra_links:entity.taxonomy_vocabulary.overview_form.' . $id])) {
+        // Transform the overview form link into the edit link, but keep the original title and parent.
+        $links['admin_toolbar_tools.extra_links:entity.taxonomy_vocabulary.overview_form.' . $id] = [
+          'title' => $vocabulary->label(),
+          'parent' => $links['admin_toolbar_tools.extra_links:entity.taxonomy_vocabulary.overview_form.' . $id]['parent']
+        ] + $links['admin_toolbar_tools.extra_links:entity.taxonomy_vocabulary.edit_form.' . $id];
+
+        // Remove the edit link.
+        unset($links['admin_toolbar_tools.extra_links:entity.taxonomy_vocabulary.edit_form.' . $id]);
+      }
+    }
+  }
+
+  $show_media_item = $config->get('show_media_item') ?? 0;
+  if ($show_media_item && $moduleHandler->moduleExists('media')) {
+    unset($links["admin_toolbar_tools.extra_links:media_page"]);
+    unset($links["admin_toolbar_tools.extra_links:media_library"]);
+    unset($links["admin_toolbar_tools.extra_links:add_media"]);
+    $mediaTypes = $entityTypeManager->getStorage('media_type')->loadMultiple();
+    foreach($mediaTypes as $id => $mediaType) {
+      unset($links["admin_toolbar_tools.extra_links:media.add.$id"]);
+    }
+    if ($moduleHandler->moduleExists('file')) {
+      unset($links['admin_toolbar_tools.extra_links:view.files']);
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_menu().
+ *
+ * Hides links from admin menu, if user doesn't have access rights.
+ *
+ * @param $variables
+ */
+function admin_toolbar_content_preprocess_menu(&$variables) {
+  if (empty($variables['items'])) {
+    /**
+     * Additional empty check to prevent exotic situations, where the preprocess
+     * function is entered even without items.
+     * @see https://www.drupal.org/node/2833885
+     */
+    return;
+  }
+  // Ensure that menu_name exists.
+  if (!isset($variables['menu_name'])) {
+    // In rare cases (for unknown reasons) menu_name may not be set.
+    // As fallback, we can fetch it from the first menu item.
+    $first_link = reset($variables['items']);
+    /** @var Drupal\Core\Menu\MenuLinkDefault $original_link */
+    // Fetch the menu_name from the original link.
+    $original_link = $first_link['original_link'];
+    $variables['menu_name'] = $original_link->getMenuName();
+  }
+  if ($variables['menu_name'] == 'admin') {
+    admin_toolbar_content_preprocess_menu_helper($variables['items']);
+  }
+}
+
+/**
+ * Recursive helper function for looping through a menu items (and its children)
+ *
+ * @param array $items
+ */
+function admin_toolbar_content_preprocess_menu_helper(array &$items) {
+  foreach ($items as $route => &$item) {
+    if (!admin_toolbar_content_preprocess_menu_helper_access_check($route, $item)) {
+      unset($items[$route]);
+    }
+    else {
+      if (!empty($items[$route]['below'])) {
+        // Recursively call this function for the child items.
+        admin_toolbar_content_preprocess_menu_helper($items[$route]['below']);
+      }
+      if (empty($items[$route]['below'])) {
+        /*
+         * Every child item has been cleared out.
+         * Now check, if the given route represents an overview page only,
+         * without having functionality on its own. In this case, we can safely
+         * unset this item, as there aren't any children left.
+         */
+        if (admin_toolbar_content_is_overview_page($route)) {
+          unset($items[$route]);
+        }
+        else {
+          // Let's remove the expanded flag.
+          $items[$route]['is_expanded'] = FALSE;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Helper function for checking menu access.
+ *
+ * @param $route
+ * @param $item
+ *
+ * @return bool
+ */
+function admin_toolbar_content_preprocess_menu_helper_access_check($route, $item) {
+
+  $has_access = true;
+
+  $user = \Drupal::currentUser();
+
+  $route_name = $route;
+  $route_params = [];
+  if (!empty($item['original_link'])) {
+    /** @var \Drupal\Core\Menu\MenuLinkBase $original_link */
+    $original_link = $item['original_link'];
+    $route_name = $original_link->getRouteName();
+    $route_params = $original_link->getRouteParameters();
+  }
+
+  switch ($route_name) {
+    case 'entity.taxonomy_vocabulary.overview_form':
+      if (isset($route_params['taxonomy_vocabulary'])) {
+        $has_access = (
+          $user->hasPermission('administer taxonomy')
+          ||
+          $user->hasPermission('edit terms in ' . $route_params['taxonomy_vocabulary'])
+          ||
+          $user->hasPermission('create terms in ' . $route_params['taxonomy_vocabulary'])
+          ||
+          $user->hasPermission('add terms in ' . $route_params['taxonomy_vocabulary'])
+        );
+      }
+
+      break;
+
+    case 'system.admin_content':
+      if (isset($route_params['type'])) {
+        // Only allow if user has any of the edit rights.
+        $has_access = (
+          $user->hasPermission('bypass node access')
+          ||
+          $user->hasPermission('create ' . $route_params['type'] . ' content')
+          ||
+          $user->hasPermission('delete any ' . $route_params['type'] . ' content')
+          ||
+          $user->hasPermission('delete own ' . $route_params['type'] . ' content')
+          ||
+          $user->hasPermission('delete ' . $route_params['type'] . ' revisions')
+          ||
+          $user->hasPermission('edit any ' . $route_params['type'] . ' content')
+          ||
+          $user->hasPermission('edit own ' . $route_params['type'] . ' content')
+          ||
+          $user->hasPermission('revert ' . $route_params['type'] . ' revisions')
+          ||
+          $user->hasPermission('view ' . $route_params['type'] . ' revisions')
+        );
+      }
+
+      break;
+
+    case 'entity.webform.results_submissions':
+      if (isset($route_params['webform'])) {
+        $has_access = (
+          $user->hasPermission('view any webform submission')
+          //  ||
+          // There is currently no fine grained permission to see only results
+          // from a specific webform.
+          // $user->hasPermission('view any webform ' . $route_params['webform'] . ' submission')
+        );
+      }
+
+      break;
+  }
+
+  return $has_access;
+}
+
+/**
+ * Checks, if the given route name matches a pure (admin) overview page that can
+ * be skipped, if there are no child items set. The typical example are routes
+ * having the SystemController::systemAdminMenuBlockPage() function as their
+ * controller callback set.
+ *
+ * @param string $route_name
+ *   The route name to check.
+ *
+ * @return bool
+ *   TRUE, if the given route name matches a pure admin overview page route,
+ *   FALSE otherwise.
+ */
+function admin_toolbar_content_is_overview_page($route_name) {
+  /** @var \Drupal\Core\Routing\RouteProviderInterface $route_provider */
+  $route_provider = \Drupal::service('router.route_provider');
+  $overview_page_controllers = [
+    '\Drupal\system\Controller\AdminController::index',
+    '\Drupal\system\Controller\SystemController::overview',
+    '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage',
+  ];
+
+  try {
+    $route = $route_provider->getRouteByName($route_name);
+    $controller = $route->getDefault('_controller');
+    $entity_list = $route->getDefault('_entity_list');
+
+    return
+      // If we don't have a controller, but we are viewing an entity list,
+      // and the type of entities usually have a menu item per bundle under them
+      // consider it to be an overview page. Example is the taxonomy vocabulary page.
+      (empty($controller) && $entity_list  == 'taxonomy_vocabulary')
+      ||
+      // If we have a controller it must match any of the overview classes.
+      (!empty($controller) && in_array($controller, $overview_page_controllers))
+      ;
+  }
+  catch (RouteNotFoundException $ex) { }
+  return FALSE;
+}
+
+/**
+ * Implements hook_preprocess_menu_local_action().
+ *
+ * Alters the 'Add new content' button to a specific 'Add new <content type>' button.
+ *
+ * @param $variables
+ */
+function admin_toolbar_content_preprocess_menu_local_action(&$variables) {
+
+  $type = \Drupal::request()->get('type');
+
+  /** @var \Drupal\Core\Url $url */
+  $url = $variables['element']['#link']['url'];
+  $route = $url->getRouteName();
+  $cache = false;
+
+  switch($route) {
+
+    case 'node.add_page':
+      $route_name = 'node.add';
+      $entity_type_id = 'node_type';
+      $cache = true;
+
+      break;
+
+    case 'entity.media.add_page':
+      $route_name = 'entity.media.add_form';
+      $entity_type_id = 'media_type';
+      $cache = true;
+
+      break;
+
+    default:
+      return;
+  }
+
+  if ($type) {
+    /** @var \Drupal\Core\Entity\EntityStorageInterface $storage */
+    $storage = \Drupal::service('entity_type.manager')->getStorage($entity_type_id);
+
+    $url = Url::fromRoute($route_name, [$entity_type_id => $type]);
+    $contentType = $storage->load($type);
+
+    if ($contentType) {
+      if ($url->access()) {
+        $label = t('Add @entity-type', ['@entity-type' => $contentType->label()]);
+        $variables['element']['#link']['title'] = $label;
+        $variables['element']['#link']['url'] = $url;
+        $variables['link']['#title'] = $label;
+        $variables['link']['#url'] = $url;
+      }
+      else {
+        $variables['element']['#access'] = \Drupal\Core\Access\AccessResult::forbidden();
+        $variables['link']['#access'] = \Drupal\Core\Access\AccessResult::forbidden();
+      }
+    }
+  }
+
+  if ($cache) {
+    $variables['element']['#cache']['contexts'][] = 'url.query_args:type';
+    $variables['link']['#cache']['contexts'][] = 'url.query_args:type';
+  }
+
+}
+
+/**
+ * Implements hook_preprocess_block().
+ *
+ * Changes the title if a type filter is added to the admin content page.
+ *
+ * @param $variables
+ */
+function admin_toolbar_content_preprocess_block(&$variables) {
+
+  if ('page_title_block' == $variables['plugin_id']) {
+    $request = \Drupal::request();
+    $path = $request->getRequestUri(); // get current path
+
+    if(strpos($path, 'admin/content')) { //check current path is user profile page
+
+      $content_type = $request->get('type');
+
+      if ($content_type) {
+
+        /** @var \Drupal\Core\Entity\EntityStorageInterface $storage */
+        $storage = \Drupal::service('entity_type.manager')->getStorage('node_type');
+        $contentType = $storage->load($content_type);
+
+        if ($contentType) {
+          if (is_array($variables['content']['#title'])) {
+            $variables['content']['#title']['#markup'] = $variables['content']['#title']['#markup']. " - " . $contentType->label();
+          }
+          else {
+            // It's of type: 'Drupal\Core\Render\Markup' (probably)
+            // Is in the case of for example an 403.
+            // We do not change the markup then because it's useless.
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_element_info_alter().
+ *
+ * @see admin_toolbar_content_views_pre_render_callback()
+ *
+ * @param $types
+ */
+function admin_toolbar_content_element_info_alter(&$types) {
+  array_unshift($types['view']['#pre_render'], ["Drupal\admin_toolbar_content\AlternativeContentView", 'preRender']);
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function admin_toolbar_content_entity_insert(EntityInterface $entity) {
+  $entities = \Drupal::service('admin_toolbar_content.helper')->getRebuildEntityTypes();
+  if (in_array($entity->getEntityTypeId(), $entities)) {
+    \Drupal::service('plugin.manager.menu.link')->rebuild();
+  }
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function admin_toolbar_content_entity_update(EntityInterface $entity) {
+  $entities = \Drupal::service('admin_toolbar_content.helper')->getRebuildEntityTypes();
+  if (in_array($entity->getEntityTypeId(), $entities)) {
+    \Drupal::service('plugin.manager.menu.link')->rebuild();
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function admin_toolbar_content_entity_delete(EntityInterface $entity) {
+  $entities = \Drupal::service('admin_toolbar_content.helper')->getRebuildEntityTypes();
+  if (in_array($entity->getEntityTypeId(), $entities)) {
+    \Drupal::service('plugin.manager.menu.link')->rebuild();
+  }
+}

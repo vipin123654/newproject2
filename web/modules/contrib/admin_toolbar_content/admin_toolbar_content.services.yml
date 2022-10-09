@@ -1,0 +1,5 @@
+services:
+  admin_toolbar_content.helper:
+    class: Drupal\admin_toolbar_content\AdminToolbarContentHelper
+    arguments:
+     - '@entity_type.manager'

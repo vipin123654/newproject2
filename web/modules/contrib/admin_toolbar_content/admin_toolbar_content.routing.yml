@@ -1,0 +1,7 @@
+admin_toolbar_content.settings:
+  path: '/admin/config/user-interface/admin-toolbar-content'
+  defaults:
+    _form: 'Drupal\admin_toolbar_content\Form\AdminToolbarContentSettingsForm'
+    _title: 'Admin Toolbar Content'
+  requirements:
+    _permission: 'administer site configuration'

@@ -1,0 +1,19 @@
+.toolbar-icon-admin-toolbar-content-admin-categoriescategories:before {
+    background-image: url(../icons/taxonomy.svg);
+}
+
+.toolbar-icon-admin-toolbar-content-admin-mediamedia:before {
+    background-image: url(../icons/media.svg);
+}
+
+.toolbar-icon-admin-toolbar-content-admin-webformswebform:before {
+    background-image: url(../icons/webform.svg);
+}
+
+.admin-toolbar-content-add-new-item {
+    margin-bottom: 2em !important;
+}
+
+.admin-toolbar-content-more-item {
+    margin-top: 2em !important;
+}

@@ -1,0 +1,25 @@
+admin_toolbar_content.settings:
+  type: config_object
+  label: 'Admin toolbar content settings'
+  mapping:
+    recent_items:
+      type: integer
+      label: 'Recent items'
+    hide_non_content_items:
+      type: boolean
+      label: 'Hide non content items'
+    show_account_link:
+      type: string
+      label: 'User account link'
+    enhance_content_item:
+      type: boolean
+      label: 'Enhance content item'
+    show_categories_item:
+      type: boolean
+      label: 'Show categories menu'
+    show_media_item:
+      type: boolean
+      label: 'Show media menu'
+    show_webforms_item:
+      type: boolean
+      label: 'Show webforms menu'

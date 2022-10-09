@@ -1,0 +1,13 @@
+name: 'Admin Toolbar Content'
+description: 'Provides extra content admin enhancements in the admin toolbar.'
+package: 'Administration'
+type: module
+core_version_requirement: ^8 || ^9 || ^10
+dependencies:
+  - 'admin_toolbar'
+  - 'admin_toolbar_tools'
+
+# Information added by Drupal.org packaging script on 2022-06-20
+version: '1.3.9'
+project: 'admin_toolbar_content'
+datestamp: 1655716476

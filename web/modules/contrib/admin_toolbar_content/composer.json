@@ -1,0 +1,24 @@
+{
+  "name": "drupal/admin_toolbar_content",
+  "description": "Provides extra content admin enhancements in the admin toolbar.",
+  "type": "drupal-module",
+  "keywords": ["Drupal 9","UX","Calibr8","Toolbar","Calibrate"],
+  "homepage": "https://www.drupal.org/project/admin_toolbar_content",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+    {
+      "name": "Kris Booghmans",
+      "email": "kris@calibrate.be",
+      "homepage": "http://www.calibrate.be"
+    }
+  ],
+  "require": {
+    "drupal/core": "^8.8 || ^9 || ^10"
+  },
+  "repositories": {
+    "drupal": {
+      "type": "composer",
+      "url": "https://packages.drupal.org/8"
+    }
+  }
+}

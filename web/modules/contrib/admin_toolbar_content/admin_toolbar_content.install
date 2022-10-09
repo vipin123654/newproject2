@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * Initialise the new configuration settings to their defaults.
+ */
+function admin_toolbar_content_update_9000() {
+  $config = \Drupal::configFactory()->getEditable('admin_toolbar_content.settings');
+  $config->set('recent_items', $config->get('recent_items') ?? 10);
+  $config->set('hide_non_content_items', $config->get('hide_non_content_items') ?? 1);
+  $config->set('show_account_link', $config->get('show_account_link') ?? '');
+  $config->set('enhance_content_item', $config->get('enhance_content_item') ?? 1);
+  $config->set('show_categories_item', $config->get('show_categories_item') ?? 1);
+  $config->set('show_media_item', $config->get('show_media_item') ?? 1);
+  $config->set('show_webforms_item', $config->get('show_webforms_item') ?? 1);
+  $config->save();
+
+  // Clear cache so admin menu can rebuild.
+  \Drupal::service('plugin.manager.menu.link')->rebuild();
+}
