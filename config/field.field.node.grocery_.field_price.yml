@@ -1,0 +1,23 @@
+uuid: 04ccd9b1-4d25-4baa-8a91-c9909999ff5f
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_price
+    - node.type.grocery_
+id: node.grocery_.field_price
+field_name: field_price
+entity_type: node
+bundle: grocery_
+label: Price
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  min: null
+  max: null
+  prefix: Rupees
+  suffix: ''
+field_type: float

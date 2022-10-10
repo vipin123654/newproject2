@@ -1,0 +1,88 @@
+uuid: 56f0c7b5-7c2e-4fd1-a6b4-99294f600534
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.node.grocery_.body
+    - field.field.node.grocery_.field_price
+    - field.field.node.grocery_.field_product_description
+    - field.field.node.grocery_.field_product_id
+    - field.field.node.grocery_.field_product_image
+    - field.field.node.grocery_.field_product_name
+    - field.field.node.grocery_.field_product_type
+    - node.type.grocery_
+  module:
+    - image
+    - text
+    - user
+id: node.grocery_.default
+targetEntityType: node
+bundle: grocery_
+mode: default
+content:
+  body:
+    type: text_default
+    label: hidden
+    settings: {  }
+    third_party_settings: {  }
+    weight: 101
+    region: content
+  field_price:
+    type: number_decimal
+    label: above
+    settings:
+      thousand_separator: ''
+      decimal_separator: .
+      scale: 2
+      prefix_suffix: true
+    third_party_settings: {  }
+    weight: 103
+    region: content
+  field_product_description:
+    type: basic_string
+    label: above
+    settings: {  }
+    third_party_settings: {  }
+    weight: 107
+    region: content
+  field_product_id:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 109
+    region: content
+  field_product_image:
+    type: image
+    label: above
+    settings:
+      image_link: ''
+      image_style: ''
+      image_loading:
+        attribute: lazy
+    third_party_settings: {  }
+    weight: 105
+    region: content
+  field_product_name:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 102
+    region: content
+  field_product_type:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 108
+    region: content
+  links:
+    settings: {  }
+    third_party_settings: {  }
+    weight: 100
+    region: content
+hidden: {  }

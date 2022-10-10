@@ -20,7 +20,9 @@
         "drupal/core-composer-scaffold": "^9.4",
         "drupal/core-project-message": "^9.4",
         "drupal/core-recommended": "^9.4",
-        "drupal/views_bulk_operations": "^4.2"
+        "drupal/vbo_export": "^4.1",
+        "drupal/views_bulk_operations": "^4.2",
+        "drush/drush": "^11.2"
     },
     "conflict": {
         "drupal/drupal": "*"

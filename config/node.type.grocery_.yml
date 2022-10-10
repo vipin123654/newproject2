@@ -1,0 +1,18 @@
+uuid: 7bea904a-1d17-440a-ba4c-2f7400843f64
+langcode: en
+status: true
+dependencies:
+  module:
+    - menu_ui
+third_party_settings:
+  menu_ui:
+    available_menus:
+      - main
+    parent: 'main:'
+name: Grocery_Product
+type: grocery_
+description: ''
+help: ''
+new_revision: true
+preview_mode: 1
+display_submitted: true

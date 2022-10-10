@@ -1,0 +1,83 @@
+<?php
+
+/**
+ * @file
+ * Delivers an action to export view results to csv.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function vbo_export_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.vbo_export':
+      $filepath = dirname(__FILE__) . '/README.md';
+      if (file_exists($filepath)) {
+        $readme = file_get_contents($filepath);
+        $output = '<pre>' . $readme . '</pre>';
+
+        return $output;
+      }
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function vbo_export_theme() {
+  return [
+    'vbo_export_pdf' => [
+      'variables' => [
+        'title' => NULL,
+        'items' => [],
+        'empty_text' => NULL,
+        // For preprocessing purposes.
+        'view_id' => NULL,
+        'display_id' => NULL,
+      ],
+    ],
+  ];
+}
+
+/**
+ * Library loader function.
+ *
+ * Loads the library if not already available and
+ * optionally checks its version.
+ */
+function _vbo_export_library_exists($classname, $details = FALSE) {
+  static $output;
+  if (!isset($output[$classname])) {
+    $output[$classname] = FALSE;
+
+    // If composer was used to add dependancy, the class should exist,
+    // Otherwise check given path.
+    if (class_exists($classname)) {
+      if ($details) {
+        $reflector = new ReflectionClass($classname);
+        $path = dirname($reflector->getFileName());
+
+        // PHPSpreadsheet.
+        if (file_exists($path . '/../../CHANGELOG.md') && $content = file_get_contents($path . '/../../CHANGELOG.md')) {
+          preg_match('/## ([0-9\.]+)/', $content, $matches);
+          if (!empty($matches[1])) {
+            $output[$classname] = trim($matches[1]);
+          }
+          else {
+            $output[$classname] = 'undetected';
+          }
+        }
+        // Dompdf.
+        elseif (file_exists($path . '/../VERSION') && $content = file_get_contents($path . '/../VERSION')) {
+          $output[$classname] = trim($content);
+        }
+      }
+      else {
+        $output[$classname] = TRUE;
+      }
+    }
+  }
+  return $output[$classname];
+}
